@@ -26,7 +26,7 @@ To undo: `node install-hooks.js --remove`
 
 ## Show your plan limits
 
-The top bar can show how much of your 5-hour and weekly limits is left. Claude Code passes these numbers only to a status line command, so add this to `~/.claude/settings.json`:
+The top bar can show how much of your 5-hour and weekly limits is left. Claude Code passes these numbers only to a status line command, so `node install-hooks.js` also sets `statusLine` to run `statusline.js`. If you already have a status line, the installer leaves it alone; to use this one instead, set it yourself in `~/.claude/settings.json`:
 
 ```json
 "statusLine": { "type": "command", "command": "node /full/path/to/statusline.js" }
@@ -68,7 +68,8 @@ Port 4243 is a separate, read-only office. It shows workers, rooms named after p
 
 - `server.js` receives hook events, tracks state, streams it to the page, and reads CLAUDE.md files for the Rulebook tab
 - `public/index.html` is the office itself (canvas drawing plus the side panel)
-- `install-hooks.js` adds or removes the hooks
+- `install-hooks.js` adds or removes the hooks and the status line
+- `statusline.js` is the status line that forwards your plan limits to the office
 
 ## Safety
 
