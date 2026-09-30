@@ -47,6 +47,13 @@
   .watching { display: flex; align-items: center; gap: 8px; color: var(--muted); font-size: 14px; }
   .watching b { color: var(--ink); font-weight: 700; }
   .watching code { font: 13px var(--code); color: var(--ink); }
+  /* 5h plan limit drawn as a coffee machine: pot fill = usage left */
+  .coffee { display: flex; align-items: center; gap: 10px; padding: 4px 10px 4px 6px; background: #14121f; border: 3px solid var(--panel-edge); border-top-width: 6px; font: 12px var(--pixel); color: var(--muted); letter-spacing: .5px; }
+  .coffee[hidden] { display: none; }
+  .pot { position: relative; width: 18px; height: 22px; border: 2px solid var(--ink); border-top-width: 3px; background: #2a2742; overflow: hidden; }
+  .pot::after { content: ""; position: absolute; right: -6px; top: 4px; width: 4px; height: 8px; border: 2px solid var(--ink); border-left: none; }
+  .brew { position: absolute; left: 0; right: 0; bottom: 0; background: #6b3e1f; border-top: 2px solid var(--wood); transition: height .6s; }
+  .coffee b { color: var(--alert); font-weight: 700; margin-right: 6px; }
   .dot { width: 10px; height: 10px; background: var(--muted); box-shadow: 0 0 0 2px #14121f; }
   .dot.live { background: var(--working); }
   .dot.down { background: var(--error); }
@@ -193,7 +200,7 @@
   <header class="topbar">
     <h1 class="brand">Agent Office</h1>
     <div class="watching" id="watching"><span class="dot" id="connDot"></span><span id="watchText">Connecting…</span></div>
-    <div class="watching" id="usage" hidden></div>
+    <div class="coffee" id="usage" hidden></div>
     <div class="actions">
       <button class="btn" id="demoBtn">Run demo</button>
       <button class="btn" id="auditBtn">Hook check</button>
@@ -963,18 +970,17 @@
     renderUsage(snap.usage);
   }
 
-  // Plan limits, forwarded by statusline.js. Claude Code only sends them for Pro/Max plans.
+  // 5h plan limit, forwarded by statusline.js. Claude Code only sends it for Pro/Max plans.
   function renderUsage(u) {
     const el = document.getElementById("usage");
-    const parts = [["5h", u?.five_hour], ["Week", u?.seven_day]]
-      .filter(([, w]) => w && w.used_percentage != null)
-      .map(([label, w]) => {
-        const left = Math.max(0, Math.round(100 - w.used_percentage));
-        const reset = w.resets_at ? new Date(w.resets_at * 1000).toLocaleString([], { weekday: "short", hour: "numeric", minute: "2-digit" }) : "";
-        return `${label}: <b>${left}% left</b>${reset ? `, resets ${esc(reset)}` : ""}`;
-      });
-    el.hidden = !parts.length;
-    el.innerHTML = parts.join(" · ");
+    const w = u?.five_hour;
+    el.hidden = !(w && w.used_percentage != null);
+    if (el.hidden) return;
+    const left = Math.max(0, Math.round(100 - w.used_percentage));
+    const reset = w.resets_at ? new Date(w.resets_at * 1000).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" }) : "?";
+    el.title = `5-hour window: ${left}% left, resets ${reset}`;
+    el.innerHTML = `<div class="pot"><div class="brew" style="height:${left}%"></div></div>`
+      + `COFFEE LEFT <b>${left}%</b> TIME TILL NEW POT <b>${esc(reset)}</b>`;
   }
 
   function connect() {
