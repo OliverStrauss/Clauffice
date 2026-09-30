@@ -2,7 +2,7 @@
 
 A pixel-art office that shows what your Claude Code sessions are doing. Each session is a worker at a desk, subagents show up as interns with laptops, and anyone who needs you gets a bouncing yellow "!".
 
-It only watches for now. You still answer questions and approve permissions in VS Code.
+It only watches, for now. You still answer questions and approve permissions in VS Code.
 
 ## Run it
 
