@@ -380,6 +380,7 @@ function publicSnapshot() {
       lastSeen: s.lastSeen,
       demo: s.demo,
     })),
+    usage: usage && { five_hour: usage.five_hour }, // coffee machine: % left and reset time only
     serverTime: now(),
   };
 }

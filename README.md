@@ -26,7 +26,7 @@ To undo: `node install-hooks.js --remove`
 
 ## Show your plan limits
 
-The top bar can show how much of your 5-hour and weekly limits is left. Claude Code passes these numbers only to a status line command, so `node install-hooks.js` also sets `statusLine` to run `statusline.js`. If you already have a status line, the installer leaves it alone; to use this one instead, set it yourself in `~/.claude/settings.json`:
+The office has a coffee machine on the wall of the first room. Its pot shows how much of your 5-hour limit is left, with the time the next pot is brewed (the reset). Claude Code passes these numbers only to a status line command, so `node install-hooks.js` also sets `statusLine` to run `statusline.js`. If you already have a status line, the installer leaves it alone; to use this one instead, set it yourself in `~/.claude/settings.json`:
 
 ```json
 "statusLine": { "type": "command", "command": "node /full/path/to/statusline.js" }
@@ -62,7 +62,7 @@ PUBLIC_PORT=4243 node server.js
 cloudflared tunnel --url http://127.0.0.1:4243
 ```
 
-Port 4243 is a separate, read-only office. It shows workers, rooms named after project folders, and what kind of thing each worker is doing (reading, writing, running a command). It never shows prompts, replies, commands, file names, paths, your machine name or the Rulebook, and it has no buttons. Share the tunnel URL, never port 4242.
+Port 4243 is a separate, read-only office. It shows workers, rooms named after project folders, what kind of thing each worker is doing (reading, writing, running a command), and the coffee machine. It never shows prompts, replies, commands, file names, paths, your machine name or the Rulebook, and it has no buttons. Share the tunnel URL, never port 4242.
 
 ## Files
 
