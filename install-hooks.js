@@ -1,4 +1,4 @@
-// Adds (or removes) the Agent Office HTTP hooks in ~/.claude/settings.json.
+// Adds (or removes) the Agent Office HTTP hooks and status line in ~/.claude/settings.json.
 //   node install-hooks.js            -> install
 //   node install-hooks.js --remove   -> uninstall
 // A backup of your settings is written next to the original first.
@@ -14,6 +14,8 @@ const EVENTS = [
   "PermissionRequest", "Notification", "Stop", "SubagentStart",
   "SubagentStop", "PreCompact", "InstructionsLoaded", "SessionEnd",
 ];
+
+const STATUS_LINE = `node ${JSON.stringify(path.join(__dirname, "statusline.js"))}`;
 
 const settingsPath = path.join(os.homedir(), ".claude", "settings.json");
 const remove = process.argv.includes("--remove");
@@ -52,7 +54,14 @@ if (!remove && Array.isArray(settings.allowedHttpHookUrls) && !settings.allowedH
   settings.allowedHttpHookUrls.push(URL);
 }
 
+// The status line forwards plan limits to the top bar. Never replace someone else's.
+const statusLineOurs = settings.statusLine?.command === STATUS_LINE;
+let statusLineNote = "";
+if (remove && statusLineOurs) delete settings.statusLine;
+else if (!remove && !settings.statusLine) settings.statusLine = { type: "command", command: STATUS_LINE };
+else if (!remove && !statusLineOurs) statusLineNote = "\nYou already have a status line, so plan limits won't show. See README.";
+
 fs.writeFileSync(settingsPath, JSON.stringify(settings, null, 2) + "\n");
 console.log(remove
   ? "Removed Agent Office hooks. Reload VS Code windows for it to take effect."
-  : `Installed hooks for ${EVENTS.length} events -> ${URL}\nReload your VS Code windows (or start new Claude sessions) so they pick it up.`);
+  : `Installed hooks for ${EVENTS.length} events -> ${URL}\nReload your VS Code windows (or start new Claude sessions) so they pick it up.${statusLineNote}`);
