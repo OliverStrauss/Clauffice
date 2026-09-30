@@ -533,7 +533,9 @@
       my -= Math.round(rise * rise * (my - seat.room.y));
       ctx.globalAlpha = 1 - rise;
     }
-    if (s.status === "working" && (s.activity === "terminal" || s.activity === "web")) {
+    // stays gone until the next prompt clears the flash
+    if (asc >= 1) ctx.globalAlpha = 0;
+    else if (s.status === "working" && (s.activity === "terminal" || s.activity === "web")) {
       const glow = s.activity === "terminal" ? C.working : C.web;
       ctx.globalAlpha = 0.55 + 0.35 * Math.sin(t * 6);
       px(mx - 1, my - 1, 13, 10, glow);

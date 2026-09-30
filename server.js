@@ -208,6 +208,7 @@ function handleEvent(payload) {
       const prompt = cleanPrompt(payload.prompt);
       if (prompt) s.lastPrompt = trim(prompt, 500);
       s.openedPr = false;
+      if (s.flash && s.flash.kind === "ascend") s.flash = null; // new prompt, new monitor
       s.currentText = "Reading the brief";
       s.activity = "read";
       if (prompt) addFeed(s, "you", prompt);
