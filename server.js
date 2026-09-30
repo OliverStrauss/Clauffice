@@ -42,6 +42,8 @@ const sessions = new Map();
 /** hook_event_name -> count, for the hook audit */
 const eventCounts = Object.fromEntries(EXPECTED_EVENTS.map((e) => [e, 0]));
 const clients = new Set();
+/** Latest plan limits from statusline.js: { five_hour, seven_day } */
+let usage = null;
 
 // ---------- helpers ----------
 
@@ -346,6 +348,7 @@ function snapshot() {
     sessions: [...sessions.values()].filter((s) => s.active),
     audit: eventCounts,
     expected: EXPECTED_EVENTS,
+    usage,
     serverTime: now(),
   };
 }
@@ -501,6 +504,17 @@ const server = http.createServer(async (req, res) => {
     } catch (e) {
       console.warn("Could not parse hook payload:", e.message);
     }
+    return;
+  }
+
+  // statusline.js POSTs the status line payload here; keep only the plan limits.
+  if (req.method === "POST" && url.pathname === "/usage") {
+    const body = await readBody(req);
+    json(res, 200, {});
+    try {
+      const limits = JSON.parse(body).rate_limits;
+      if (limits) { usage = limits; broadcast(); }
+    } catch { /* ignore bad payloads */ }
     return;
   }
 

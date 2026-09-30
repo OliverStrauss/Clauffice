@@ -24,6 +24,16 @@ This adds HTTP hooks to `~/.claude/settings.json` (a backup is saved next to it 
 
 To undo: `node install-hooks.js --remove`
 
+## Show your plan limits
+
+The top bar can show how much of your 5-hour and weekly limits is left. Claude Code passes these numbers only to a status line command, so add this to `~/.claude/settings.json`:
+
+```json
+"statusLine": { "type": "command", "command": "node /full/path/to/statusline.js" }
+```
+
+The numbers update whenever Claude Code redraws its status line. They appear only for Pro and Max plans, and only from sessions that run a status line (the terminal CLI; the VS Code panel may not).
+
 ## First thing to do: the hook check
 
 The VS Code extension doesn't fire every hook the terminal CLI does. After connecting, do a normal task in VS Code, then click **Hook check**. Any event still at zero isn't reaching the office from your setup. Every event is also saved to `logs/events.jsonl` so you can see the real payloads. The log starts fresh each time the server starts, and the previous run is kept as `logs/events.old.jsonl`.

@@ -193,6 +193,7 @@
   <header class="topbar">
     <h1 class="brand">Agent Office</h1>
     <div class="watching" id="watching"><span class="dot" id="connDot"></span><span id="watchText">Connecting…</span></div>
+    <div class="watching" id="usage" hidden></div>
     <div class="actions">
       <button class="btn" id="demoBtn">Run demo</button>
       <button class="btn" id="auditBtn">Hook check</button>
@@ -957,6 +958,21 @@
     document.body.classList.toggle("public", !!snap.public);
     if (snap.public) { watchText.textContent = `Live view${n ? `, ${n} at work` : ""}`; return; }
     watchText.innerHTML = `Watching Claude sessions on <b>${esc(snap.watching.host)}</b>, hooks post to <code>${esc(snap.watching.endpoint)}</code>${n ? `, ${n} at work` : ""}`;
+    renderUsage(snap.usage);
+  }
+
+  // Plan limits, forwarded by statusline.js. Claude Code only sends them for Pro/Max plans.
+  function renderUsage(u) {
+    const el = document.getElementById("usage");
+    const parts = [["5h", u?.five_hour], ["Week", u?.seven_day]]
+      .filter(([, w]) => w && w.used_percentage != null)
+      .map(([label, w]) => {
+        const left = Math.max(0, Math.round(100 - w.used_percentage));
+        const reset = w.resets_at ? new Date(w.resets_at * 1000).toLocaleString([], { weekday: "short", hour: "numeric", minute: "2-digit" }) : "";
+        return `${label}: <b>${left}% left</b>${reset ? `, resets ${esc(reset)}` : ""}`;
+      });
+    el.hidden = !parts.length;
+    el.innerHTML = parts.join(" · ");
   }
 
   function connect() {
