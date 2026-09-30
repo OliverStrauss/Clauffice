@@ -1,0 +1,980 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Agent Office</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Pixelify+Sans:wght@400;600&family=Atkinson+Hyperlegible:wght@400;700&family=JetBrains+Mono:wght@400&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --night: #1d1b2e;
+    --panel: #2a2742;
+    --panel-edge: #3b3760;
+    --ink: #f1e9d8;
+    --muted: #a9a2c4;
+    --alert: #ffd84a;
+    --working: #6fd3bf;
+    --error: #ff7a6b;
+    --done: #7fe07a;
+    --wood: #d9a066;
+    --pixel: "Pixelify Sans", "Trebuchet MS", system-ui, sans-serif;
+    --body: "Atkinson Hyperlegible", "Segoe UI", system-ui, sans-serif;
+    --code: "JetBrains Mono", Consolas, "Courier New", monospace;
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; margin: 0; }
+  body {
+    background: var(--night);
+    color: var(--ink);
+    font: 15px/1.5 var(--body);
+    display: flex;
+    flex-direction: column;
+  }
+  button { font: inherit; color: inherit; cursor: pointer; }
+  :focus-visible { outline: 2px solid var(--alert); outline-offset: 2px; }
+
+  /* ---------- top bar ---------- */
+  .topbar {
+    display: flex; align-items: center; gap: 20px; flex-wrap: wrap;
+    padding: 12px 20px;
+    border-bottom: 3px solid #14121f;
+    background: #242139;
+  }
+  .brand { font: 600 22px/1 var(--pixel); letter-spacing: 0.02em; margin: 0; }
+  .public #demoBtn, .public #auditBtn, .public .pointed, .public .tabs, .public [data-action="demo"] { display: none; }
+  .watching { display: flex; align-items: center; gap: 8px; color: var(--muted); font-size: 14px; }
+  .watching b { color: var(--ink); font-weight: 700; }
+  .watching code { font: 13px var(--code); color: var(--ink); }
+  .dot { width: 10px; height: 10px; background: var(--muted); box-shadow: 0 0 0 2px #14121f; }
+  .dot.live { background: var(--working); }
+  .dot.down { background: var(--error); }
+  .actions { margin-left: auto; display: flex; gap: 8px; }
+  .btn {
+    background: var(--panel); border: 2px solid var(--panel-edge);
+    padding: 6px 12px; font: 16px/1.2 var(--pixel);
+    box-shadow: 0 3px 0 #14121f;
+  }
+  .btn:hover { border-color: var(--muted); }
+  .btn:active { transform: translateY(2px); box-shadow: 0 1px 0 #14121f; }
+
+  /* ---------- layout ---------- */
+  .layout { flex: 1; display: flex; min-height: 0; }
+  .floor-wrap { flex: 1; overflow: auto; padding: 20px; min-width: 0; }
+  .floor { position: relative; margin: 0 auto; width: max-content; }
+  canvas { display: block; image-rendering: pixelated; image-rendering: crisp-edges; }
+  #overlay { position: absolute; inset: 0; pointer-events: none; }
+
+  .room-sign {
+    position: absolute; pointer-events: auto;
+    display: flex; align-items: center; gap: 8px;
+    background: #5b3a24; border: 2px solid #221d33;
+    padding: 2px 10px; color: #fbe7c6;
+    font: 600 15px/1.3 var(--pixel);
+    box-shadow: 0 2px 0 #221d33;
+    white-space: nowrap;
+  }
+  .room-sign .where { font: 400 12px var(--body); color: #e6c9a0; }
+  .badge { font: 400 12px var(--body); padding: 0 6px; border: 1px solid currentColor; }
+  .badge.danger { color: #ffb3a8; background: #7a2a2a; }
+  .badge.plan { color: #cfe8ff; background: #2d4a6b; }
+
+  .nameplate {
+    position: absolute; pointer-events: auto; text-align: left;
+    background: #1b1929; border: 2px solid #221d33; padding: 0;
+    display: flex; flex-direction: column;
+    box-shadow: 0 2px 0 #14121f;
+  }
+  .nameplate .bar {
+    display: flex; align-items: center; gap: 6px;
+    background: var(--panel-edge); padding: 1px 6px;
+    font: 600 12px/1.4 var(--pixel);
+  }
+  .nameplate .bar .who { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .nameplate .bar .lamp { width: 7px; height: 7px; background: var(--muted); flex: none; }
+  .nameplate .line {
+    padding: 2px 6px; font: 11px/1.35 var(--code); color: var(--muted);
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .nameplate.working .lamp { background: var(--working); }
+  .nameplate.waiting { border-color: var(--alert); }
+  .nameplate.waiting .bar { background: var(--alert); color: #2a2000; }
+  .nameplate.waiting .lamp { background: #2a2000; }
+  .nameplate.waiting .line { color: var(--ink); }
+  .nameplate.done { border-color: var(--done); }
+  .nameplate.done .bar { background: var(--done); color: #0f2a0d; }
+  .nameplate.done .lamp { background: #0f2a0d; }
+  .nameplate.done .line { color: var(--ink); }
+  .nameplate.asleep { opacity: 0.6; }
+  .nameplate.selected { outline: 2px solid var(--ink); outline-offset: 1px; }
+
+  .empty {
+    position: absolute; pointer-events: auto;
+    left: 50%; transform: translateX(-50%);
+    max-width: 440px; text-align: center;
+    background: rgba(29, 27, 46, 0.92); border: 2px solid var(--panel-edge);
+    padding: 16px 20px;
+  }
+  .empty h2 { font: 600 20px/1.2 var(--pixel); margin: 0 0 6px; }
+  .empty p { margin: 0 0 12px; color: var(--muted); }
+
+  /* ---------- inspector ---------- */
+  .inspector {
+    width: 400px; flex: none; overflow-y: auto;
+    background: var(--panel); border-left: 3px solid #14121f;
+    padding: 18px 20px 28px;
+  }
+  .inspector[hidden] { display: none; }
+  .insp-head { display: flex; align-items: flex-start; gap: 10px; }
+  .insp-head h2 { font: 600 24px/1.1 var(--pixel); margin: 0; }
+  .insp-head .sub { color: var(--muted); font-size: 14px; }
+  .close { margin-left: auto; background: none; border: 2px solid var(--panel-edge); width: 32px; height: 32px; font: 18px/1 var(--pixel); }
+  .pointed {
+    margin: 14px 0; padding: 10px 12px;
+    background: #211f35; border-left: 4px solid var(--wood);
+    font-size: 14px;
+  }
+  .pointed dl { display: grid; grid-template-columns: auto 1fr; gap: 2px 12px; margin: 0; }
+  .pointed dt { color: var(--muted); }
+  .pointed dd { margin: 0; font: 13px/1.5 var(--code); word-break: break-all; }
+  .sticky {
+    background: var(--alert); color: #2a2000;
+    padding: 12px 14px; margin: 14px 0;
+    box-shadow: 4px 4px 0 #14121f;
+    transform: rotate(-0.6deg);
+  }
+  .sticky strong { display: block; font: 600 17px/1.2 var(--pixel); margin-bottom: 4px; }
+  .sticky p { margin: 0 0 6px; }
+  .sticky small { opacity: 0.8; }
+  .tabs { display: flex; gap: 4px; margin: 16px 0 10px; border-bottom: 2px solid var(--panel-edge); }
+  .tab { background: none; border: none; padding: 6px 12px; font: 16px var(--pixel); color: var(--muted); border-bottom: 3px solid transparent; margin-bottom: -2px; }
+  .tab[aria-selected="true"] { color: var(--ink); border-bottom-color: var(--wood); }
+  .section-title { font: 600 15px var(--pixel); color: var(--muted); margin: 14px 0 6px; }
+  .prompt-box { background: #211f35; padding: 8px 10px; white-space: pre-wrap; }
+  .feed { list-style: none; margin: 0; padding: 0; }
+  .feed li { display: grid; grid-template-columns: 58px 1fr; gap: 8px; padding: 5px 0; border-bottom: 1px solid #34304f; font-size: 14px; }
+  .feed .when { color: var(--muted); font-size: 12px; padding-top: 2px; }
+  .feed .what { word-break: break-word; }
+  .feed .tool .what, .feed .intern .what { font: 13px/1.5 var(--code); }
+  .feed .intern .what { color: #c9c2ec; }
+  .feed .ask .what { color: var(--alert); }
+  .feed .error .what { color: var(--error); }
+  .feed .you .what::before { content: "You: "; color: var(--wood); font-weight: 700; }
+  .feed .claude .what { white-space: pre-wrap; }
+  .feed .system .what { color: var(--muted); font-style: italic; }
+  .rule-file { margin: 10px 0; border: 2px solid var(--panel-edge); }
+  .rule-file summary { cursor: pointer; padding: 6px 10px; background: #211f35; font-weight: 700; }
+  .rule-file summary span { display: block; font: 12px var(--code); color: var(--muted); font-weight: 400; word-break: break-all; }
+  .rule-file pre { margin: 0; padding: 10px; max-height: 360px; overflow: auto; font: 12.5px/1.5 var(--code); white-space: pre-wrap; }
+  .hint { color: var(--muted); font-size: 14px; }
+
+  /* ---------- hook check dialog ---------- */
+  dialog {
+    background: var(--panel); color: var(--ink);
+    border: 3px solid var(--panel-edge); padding: 20px 24px; max-width: 520px;
+    box-shadow: 6px 6px 0 #14121f;
+  }
+  dialog::backdrop { background: rgba(10, 8, 20, 0.6); }
+  dialog h2 { font: 600 22px var(--pixel); margin: 0 0 6px; }
+  dialog table { width: 100%; border-collapse: collapse; margin: 12px 0; font-size: 14px; }
+  dialog td { padding: 4px 0; border-bottom: 1px solid #34304f; }
+  dialog td:last-child { text-align: right; font-family: var(--code); }
+  dialog tr.zero td { color: var(--muted); }
+  dialog tr.zero td:last-child::after { content: "  not seen"; font-family: var(--body); font-size: 12px; }
+
+  @media (max-width: 900px) {
+    .layout { flex-direction: column; }
+    .inspector { width: auto; border-left: none; border-top: 3px solid #14121f; max-height: 55vh; }
+  }
+</style>
+</head>
+<body>
+  <header class="topbar">
+    <h1 class="brand">Agent Office</h1>
+    <div class="watching" id="watching"><span class="dot" id="connDot"></span><span id="watchText">Connecting…</span></div>
+    <div class="actions">
+      <button class="btn" id="demoBtn">Run demo</button>
+      <button class="btn" id="auditBtn">Hook check</button>
+    </div>
+  </header>
+
+  <main class="layout">
+    <section class="floor-wrap" id="floorWrap" aria-label="Office floor">
+      <div class="floor" id="floor">
+        <canvas id="office" aria-hidden="true"></canvas>
+        <div id="overlay"></div>
+      </div>
+    </section>
+    <aside class="inspector" id="inspector" hidden></aside>
+  </main>
+
+  <dialog id="auditDialog">
+    <h2>Hook check</h2>
+    <p class="hint">Do a normal task in VS Code, then look here. Anything still at zero isn't reaching the office from your setup, so the office can't react to it.</p>
+    <table id="auditTable"></table>
+    <form method="dialog"><button class="btn">Close</button></form>
+  </dialog>
+
+<script>
+(() => {
+  // ================= constants =================
+  const W = 320;           // logical canvas width in pixels
+  const WALL = 26;         // wall band height per room
+  const ROW = 54;          // height of one row of desks
+  const SLOTS = 4;         // desks per row
+  const SLOT_W = 72;
+  const FIRST_X = 26;      // desks start here (door lives to the left)
+  const GAP = 4;           // divider between rooms
+  const DOOR_X = 8;
+  const reducedMotion = matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const SPEED = reducedMotion ? 1e6 : 34; // logical px per second
+
+  const NAMES = ["Ada", "Grace", "Alan", "Linus", "Margaret", "Dennis", "Barbara", "Ken",
+    "Radia", "Donald", "Frances", "Edsger", "Hedy", "Katherine", "Guido", "Anders",
+    "Bjarne", "Sophie", "Brian", "Joan"];
+  const SHIRTS = ["#e0664f", "#4f8fe0", "#58b36a", "#9b6ad6", "#e0a23a", "#3fb8b0", "#d65a9a", "#7a8a9e"];
+  const HAIRS = ["#2b1d14", "#6b3e1f", "#c98b3a", "#1c1c28", "#8a2f23", "#d9d0c0"];
+  const SKINS = ["#f1c9a5", "#d9a47c", "#a86f4c", "#6e4630", "#f6dcc4"];
+
+  const C = {
+    k: "#221d33",
+    wall: "#45406b", wallDark: "#3a355c", base: "#2c2847",
+    floorA: "#9a6a45", floorB: "#8c5f3d", seam: "#7a5134",
+    deskTop: "#d9a066", deskFront: "#b87d48", deskEdge: "#5b3a24",
+    chair: "#3d3a5a", monitor: "#2f3448", monitorEdge: "#1c1f2b",
+    pot: "#b5593a", leaf: "#4f9a58", leafDark: "#3b7a44",
+    door: "#5c4a7d", doorEdge: "#2c2847", knob: "#ffd84a",
+    paper: "#f4f1e8", mug: "#f4f1e8", steam: "#d9d6e8",
+    alert: "#ffd84a", working: "#6fd3bf", web: "#7fb6d9", puff: "#b9b6c8",
+    badge: "#ffd84a",
+  };
+
+  // 10 x 14 character sprite. k=outline h=hair s=skin c=shirt p=pants
+  const BODY = [
+    "..kkkkkk..",
+    ".khhhhhhk.",
+    ".khsssshk.",
+    ".kskssksk.",
+    ".kssssssk.",
+    "..kssssk..",
+    "kcccccccck",
+    "kcccccccck",
+    "kcccccccck",
+    "ksccccccsk",
+    ".kppppppk.",
+    ".kppkkppk.",
+    ".kpk..kpk.",
+    ".kkk..kkk.",
+  ];
+  const LEGS_B = ["..kpkkpk..", "..kkkkkk.."];
+
+  // ================= state =================
+  let state = { sessions: [], audit: {}, expected: [], watching: {} };
+  let clockOffset = 0;
+  let layout = { rooms: [], height: 140, seats: new Map() };
+  const deskAssignments = new Map(); // roomKey -> Map(sessionId -> slot)
+  const actors = new Map();          // key -> actor
+  let firstSnapshot = true;
+  let selectedId = null;
+  let inspectorTab = "activity";
+  let hitboxes = [];
+  let scale = 3;
+
+  const canvas = document.getElementById("office");
+  const ctx = canvas.getContext("2d");
+  const overlay = document.getElementById("overlay");
+  const floor = document.getElementById("floor");
+  const floorWrap = document.getElementById("floorWrap");
+  const inspector = document.getElementById("inspector");
+
+  // ================= helpers =================
+  function hash(str) {
+    let h = 2166136261;
+    for (let i = 0; i < str.length; i++) { h ^= str.charCodeAt(i); h = Math.imul(h, 16777619); }
+    return h >>> 0;
+  }
+  function looks(id, title) {
+    const h = hash(id);
+    return {
+      name: title || NAMES[h % NAMES.length],
+      shirt: SHIRTS[(h >>> 5) % SHIRTS.length],
+      hair: HAIRS[(h >>> 9) % HAIRS.length],
+      skin: SKINS[(h >>> 13) % SKINS.length],
+      longHair: ((h >>> 17) & 1) === 1,
+    };
+  }
+  function internLooks(id) {
+    const l = looks(id);
+    return { ...l, shirt: "#e8e4d4", pants: "#4a5a7a", intern: true };
+  }
+  const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+  function ago(t) {
+    const s = Math.max(0, Math.round((Date.now() + clockOffset - t) / 1000));
+    if (s < 60) return `${s}s ago`;
+    if (s < 3600) return `${Math.round(s / 60)}m ago`;
+    return `${Math.round(s / 3600)}h ago`;
+  }
+  const px = (x, y, w, h, color) => { ctx.fillStyle = color; ctx.fillRect(Math.round(x), Math.round(y), w, h); };
+
+  function drawSprite(rows, x, y, pal, fromRow = 0, toRow = rows.length) {
+    x = Math.round(x); y = Math.round(y);
+    for (let r = fromRow; r < toRow; r++) {
+      const row = rows[r];
+      for (let c = 0; c < row.length; c++) {
+        const ch = row[c];
+        if (ch === ".") continue;
+        ctx.fillStyle = pal[ch];
+        ctx.fillRect(x + c, y + r, 1, 1);
+      }
+    }
+  }
+  function palette(l) {
+    return { k: C.k, h: l.hair, s: l.skin, c: l.shirt, p: l.pants || "#3b3f5c" };
+  }
+  function bodyRows(l, walkFrame, eyesClosed) {
+    const rows = BODY.slice();
+    if (l.longHair) {
+      rows[3] = rows[3].replace(/^\.k/, ".h").replace(/k\.$/, "h.");
+      rows[4] = rows[4].replace(/^\.k/, ".h").replace(/k\.$/, "h.");
+    }
+    if (eyesClosed) rows[3] = rows[3].slice(0, 2) + "ssssss" + rows[3].slice(8);
+    if (walkFrame) { rows[12] = LEGS_B[0]; rows[13] = LEGS_B[1]; }
+    return rows;
+  }
+
+  // ================= layout =================
+  function roomKeyOf(s) { return s.cwd || s.project || "unknown"; }
+
+  function computeLayout() {
+    const groups = new Map();
+    for (const s of state.sessions) {
+      const key = roomKeyOf(s);
+      if (!groups.has(key)) groups.set(key, []);
+      groups.get(key).push(s);
+    }
+    const ordered = [...groups.entries()].sort(
+      (a, b) => Math.min(...a[1].map((s) => s.startedAt)) - Math.min(...b[1].map((s) => s.startedAt)));
+
+    const rooms = [];
+    const seats = new Map();
+    let y = 0;
+    for (const [key, list] of ordered) {
+      let desks = deskAssignments.get(key);
+      if (!desks) { desks = new Map(); deskAssignments.set(key, desks); }
+      const present = new Set(list.map((s) => s.id));
+      for (const id of [...desks.keys()]) if (!present.has(id)) desks.delete(id);
+      for (const s of list.sort((a, b) => a.startedAt - b.startedAt)) {
+        if (desks.has(s.id)) continue;
+        const used = new Set(desks.values());
+        let slot = 0; while (used.has(slot)) slot++;
+        desks.set(s.id, slot);
+      }
+      const maxSlot = Math.max(0, ...desks.values());
+      const rows = Math.floor(maxSlot / SLOTS) + 1;
+      const room = { key, project: list[0].project, cwd: list[0].cwd, host: list[0].host, sessions: list, y, rows, h: WALL + rows * ROW + 4 };
+      rooms.push(room);
+      for (const s of list) {
+        const slot = desks.get(s.id);
+        const sx = FIRST_X + (slot % SLOTS) * SLOT_W;
+        const sy = y + WALL + Math.floor(slot / SLOTS) * ROW;
+        seats.set(s.id, { room, sx, sy, wx: sx + 17, wy: sy + 8, deskX: sx + 2, deskTop: sy + 18,
+          door: { x: DOOR_X, y: y + WALL - 12 } });
+      }
+      y += room.h + GAP;
+    }
+    const height = rooms.length ? y - GAP : WALL + ROW + 60;
+    for (const [key] of deskAssignments) if (!groups.has(key)) deskAssignments.delete(key);
+    layout = { rooms, height, seats };
+  }
+
+  function internSeat(seat, k) {
+    return { x: seat.sx + 36 + k * 15, y: seat.sy + 10 };
+  }
+
+  // ================= actors (walking) =================
+  function syncActors() {
+    const wanted = new Set();
+    for (const s of state.sessions) {
+      const seat = layout.seats.get(s.id);
+      if (!seat) continue;
+      const key = s.id;
+      wanted.add(key);
+      let a = actors.get(key);
+      const leaving = s.status === "leaving";
+      if (!a) {
+        a = firstSnapshot || reducedMotion
+          ? { x: seat.wx, y: seat.wy, path: [] }
+          : { x: seat.door.x, y: seat.door.y, path: [{ x: seat.door.x, y: seat.wy }, { x: seat.wx, y: seat.wy }] };
+        a.kind = "worker"; a.sid = s.id; a.door = seat.door;
+        actors.set(key, a);
+      }
+      a.door = seat.door;
+      if (leaving && !a.leaving) {
+        a.leaving = true;
+        a.path = [{ x: seat.door.x, y: a.y }, { x: seat.door.x, y: seat.door.y }];
+      } else if (!a.leaving) {
+        retarget(a, seat.wx, seat.wy);
+      }
+
+      Object.keys(s.interns || {}).forEach((agentId, k) => {
+        const ikey = `${s.id}:${agentId}`;
+        wanted.add(ikey);
+        const spot = internSeat(seat, Math.min(k, 1));
+        let ia = actors.get(ikey);
+        if (!ia) {
+          ia = firstSnapshot || reducedMotion
+            ? { x: spot.x, y: spot.y, path: [] }
+            : { x: seat.door.x, y: seat.door.y, path: [{ x: seat.door.x, y: spot.y + 2 }, { x: spot.x, y: spot.y + 2 }, spot] };
+          ia.kind = "intern"; ia.sid = s.id; ia.agentId = agentId; ia.index = k;
+          actors.set(ikey, ia);
+        }
+        ia.index = k; ia.door = seat.door;
+        if (k < 2) retarget(ia, spot.x, spot.y);
+      });
+    }
+    // Anyone no longer in the data walks out.
+    for (const [key, a] of actors) {
+      if (wanted.has(key) || a.leaving) continue;
+      a.leaving = true;
+      const door = a.door || { x: DOOR_X, y: 0 };
+      a.path = [{ x: a.x, y: a.y + 3 }, { x: door.x, y: a.y + 3 }, { x: door.x, y: door.y }];
+      if (reducedMotion) actors.delete(key);
+    }
+    firstSnapshot = false;
+  }
+
+  function retarget(a, x, y) {
+    if (a.path.length === 0) {
+      if (Math.abs(a.x - x) > 0.5 || Math.abs(a.y - y) > 0.5) { a.x = x; a.y = y; } // room shifted: snap
+    } else {
+      a.path[a.path.length - 1] = { x, y };
+    }
+  }
+
+  function stepActors(dt) {
+    for (const [key, a] of actors) {
+      let budget = SPEED * dt;
+      while (budget > 0 && a.path.length) {
+        const t = a.path[0];
+        const dx = t.x - a.x, dy = t.y - a.y;
+        const d = Math.hypot(dx, dy);
+        if (d <= budget) { a.x = t.x; a.y = t.y; a.path.shift(); budget -= d; }
+        else { a.x += (dx / d) * budget; a.y += (dy / d) * budget; budget = 0; }
+      }
+      if (a.leaving && a.path.length === 0) actors.delete(key);
+    }
+  }
+
+  // ================= drawing =================
+  function skyColors() {
+    const h = new Date().getHours();
+    if (h >= 7 && h < 17) return { sky: "#8fc7e8", low: "#bfe0f0", stars: false };
+    if (h >= 17 && h < 20) return { sky: "#e8906b", low: "#f2c17a", stars: false };
+    return { sky: "#2b3566", low: "#3d4a80", stars: true };
+  }
+
+  function drawRoom(room, t) {
+    const y = room.y;
+    // wall
+    px(0, y, W, WALL, C.wall);
+    for (let x = 0; x < W; x += 8) px(x, y, 4, WALL - 3, C.wallDark);
+    px(0, y + WALL - 3, W, 3, C.base);
+    // windows
+    const sky = skyColors();
+    for (let wx = 150; wx < W - 30; wx += 58) {
+      px(wx - 1, y + 3, 22, 14, C.base);
+      px(wx, y + 4, 20, 12, sky.sky);
+      px(wx, y + 11, 20, 5, sky.low);
+      px(wx + 9, y + 4, 2, 12, C.base);
+      if (sky.stars) { px(wx + 3, y + 6, 1, 1, "#fff"); px(wx + 15, y + 8, 1, 1, "#fff"); px(wx + 6, y + 9, 1, 1, "#ddd"); }
+    }
+    // door
+    px(DOOR_X - 2, y + 3, 14, WALL - 3, C.doorEdge);
+    px(DOOR_X - 1, y + 4, 12, WALL - 4, C.door);
+    px(DOOR_X + 8, y + 14, 2, 2, C.knob);
+    // floor planks
+    const floorH = room.h - WALL;
+    for (let r = 0; r * 6 < floorH; r++) {
+      const fy = y + WALL + r * 6;
+      const h = Math.min(6, floorH - r * 6);
+      px(0, fy, W, h, r % 2 ? C.floorA : C.floorB);
+      const off = (r * 23) % 40;
+      for (let sx = off; sx < W; sx += 40) px(sx, fy, 1, h, C.seam);
+    }
+    // plant in the corner
+    const pxX = W - 16, pyY = y + WALL - 8;
+    px(pxX + 2, pyY + 6, 8, 7, C.pot);
+    px(pxX + 1, pyY + 5, 10, 2, C.k);
+    px(pxX + 4, pyY - 6, 4, 11, C.leaf);
+    px(pxX, pyY - 3, 4, 6, C.leafDark);
+    px(pxX + 8, pyY - 4, 4, 7, C.leafDark);
+    px(pxX + 5, pyY - 9, 2, 4, C.leaf);
+  }
+
+  function drawDesk(seat, s, t) {
+    const { deskX, deskTop } = seat;
+    // desk
+    px(deskX, deskTop, 30, 3, C.deskTop);
+    px(deskX, deskTop + 3, 30, 8, C.deskFront);
+    px(deskX, deskTop + 11, 30, 1, C.deskEdge);
+    px(deskX, deskTop + 3, 30, 1, C.deskEdge);
+    px(deskX + 2, deskTop + 5, 8, 4, C.deskEdge); // drawer
+    px(deskX + 5, deskTop + 6, 2, 1, C.deskTop);
+    // PR opened: heavenly light takes the monitor up
+    const asc = s.flash && s.flash.kind === "ascend" && seat.room ? (serverNow() - s.flash.at) / ASCEND_MS : -1;
+    if (asc >= 0 && asc < 1) drawHeavenlyLight(seat, asc, t);
+    // monitor (back side facing us)
+    const mx = deskX + 2;
+    let my = deskTop - 10;
+    if (asc >= 0 && asc < 1) {
+      const rise = reducedMotion ? 1 : Math.max(0, Math.min(1, (asc - 0.2) / 0.55));
+      my -= Math.round(rise * rise * (my - seat.room.y));
+      ctx.globalAlpha = 1 - rise;
+    }
+    if (s.status === "working" && (s.activity === "terminal" || s.activity === "web")) {
+      const glow = s.activity === "terminal" ? C.working : C.web;
+      ctx.globalAlpha = 0.55 + 0.35 * Math.sin(t * 6);
+      px(mx - 1, my - 1, 13, 10, glow);
+      ctx.globalAlpha = 1;
+    }
+    px(mx, my, 11, 8, C.monitorEdge);
+    px(mx + 1, my + 1, 9, 6, C.monitor);
+    px(mx + 4, my + 8, 3, 2, C.monitorEdge);
+    ctx.globalAlpha = 1;
+    // coffee when done
+    if (s.status === "done") {
+      const cx = deskX + 26, cy = deskTop - 3;
+      px(cx, cy, 3, 3, C.mug); px(cx + 3, cy + 1, 1, 1, C.mug);
+      if (!reducedMotion) {
+        const f = Math.floor(t * 3) % 3;
+        px(cx + 1, cy - 2 - f, 1, 1, C.steam);
+        px(cx, cy - 4 - ((f + 1) % 3), 1, 1, C.steam);
+      }
+    }
+  }
+
+  const ASCEND_MS = 6000;
+  function drawHeavenlyLight(seat, p, t) {
+    const cx = seat.deskX + 7, top = seat.room.y, h = seat.deskTop + 3 - top;
+    const a = Math.min(1, p / 0.15, (1 - p) / 0.15); // fade in, hold, fade out
+    ctx.globalAlpha = 0.25 * a; px(cx - 10, top, 21, h, "#fff1a8");
+    ctx.globalAlpha = 0.45 * a; px(cx - 5, top, 11, h, "#fffbe3");
+    if (!reducedMotion) {
+      for (let i = 0; i < 10; i++) { // sparkles drifting up
+        const f = (t * 0.5 + i / 10) % 1;
+        ctx.globalAlpha = a * (1 - f);
+        px(cx - 8 + ((i * 7) % 17), top + h - f * h, 1, 1, "#fff");
+      }
+    }
+    ctx.globalAlpha = 1;
+  }
+
+  function drawSeatedWorker(seat, s, a, t, l) {
+    const x = a.x, y0 = a.y;
+    const asleep = s.status === "asleep";
+    const y = asleep ? y0 + 4 : y0;
+    // chair back
+    px(x - 1, seat.sy + 9, 12, 10, C.chair);
+    const rows = bodyRows(l, false, asleep);
+    rows[9] = "kcccccccck"; // hands go on the desk instead
+    const visible = Math.max(0, Math.min(rows.length, seat.deskTop - y));
+    drawSprite(rows, x, y, palette(l), 0, visible);
+    // yawn mouth
+    if (s.flash && s.flash.kind === "yawn" && serverNow() - s.flash.at < 2500) px(x + 4, y + 4, 2, 2, C.k);
+    return { x, y };
+  }
+
+  function drawHandsAndProps(seat, s, x, y, t, l) {
+    if (s.status === "asleep") return;
+    const top = seat.deskTop;
+    const working = s.status === "working";
+    const f = working && !reducedMotion ? Math.floor(t * 8) % 2 : 0;
+    if (working && s.activity === "read") {
+      px(x + 2, y + 6, 6, 5, C.paper);
+      px(x + 3, y + 7, 4, 1, "#c9c4b4"); px(x + 3, y + 9, 3, 1, "#c9c4b4");
+      px(x + 1, y + 9, 1, 2, l.skin); px(x + 8, y + 9, 1, 2, l.skin);
+    } else if (working && s.activity === "delegate") {
+      px(x + 10, y + 1 - f, 2, 5, l.shirt); px(x + 10, y - f, 2, 2, l.skin); // hand up, calling the intern
+      px(x + 2, top - 1, 2, 1, l.skin);
+    } else {
+      px(x + 2, top - 1 - f, 2, 1, l.skin);
+      px(x + 6, top - 1 - (1 - f), 2, 1, l.skin);
+      px(x + 1, top, 8, 1, "#3a3550"); // keyboard
+    }
+  }
+
+  function drawIntern(seat, s, a, t, idx) {
+    const l = internLooks(a.agentId || "intern");
+    const sitting = a.path.length === 0 && !a.leaving;
+    if (sitting) {
+      const tableX = a.x - 2, tableTop = seat.sy + 21;
+      px(a.x - 1, seat.sy + 11, 12, 9, C.chair);
+      const rows = bodyRows(l, false, false);
+      rows[9] = "kcccccccck";
+      const visible = Math.max(0, Math.min(rows.length, tableTop - a.y));
+      drawSprite(rows, a.x, a.y, palette(l), 0, visible);
+      px(a.x + 4, a.y + 7, 2, 2, C.badge); // lanyard badge
+      px(tableX, tableTop, 14, 2, C.deskTop);
+      px(tableX + 1, tableTop + 2, 2, 7, C.deskEdge);
+      px(tableX + 11, tableTop + 2, 2, 7, C.deskEdge);
+      // laptop, lid facing us
+      px(a.x + 1, tableTop - 5, 8, 5, "#8a8fa3");
+      px(a.x + 4, tableTop - 3, 2, 1, "#e8e4d4");
+      px(a.x, tableTop - 1, 10, 1, "#5f6478");
+      const f = reducedMotion ? 0 : Math.floor(t * 9 + idx) % 2;
+      px(a.x + 1, tableTop - 1 - f, 2, 1, l.skin);
+      px(a.x + 7, tableTop - 1 - (1 - f), 2, 1, l.skin);
+    } else {
+      drawWalker(a, l, t);
+      px(a.x + 4, a.y + 7, 2, 2, C.badge);
+      px(a.x - 2, a.y + 8, 5, 4, "#8a8fa3"); // carrying the laptop
+    }
+    hitboxes.push({ sid: s.id, x: a.x - 2, y: a.y - 2, w: 14, h: 20 });
+  }
+
+  function drawWalker(a, l, t) {
+    const frame = reducedMotion ? 0 : Math.floor(t * 6) % 2;
+    const bob = frame ? -1 : 0;
+    drawSprite(bodyRows(l, frame === 1, false), a.x, a.y + bob, palette(l));
+  }
+
+  function drawBubbles(s, x, y, t) {
+    const now = serverNow();
+    if (s.status === "waiting") {
+      const b = reducedMotion ? 0 : Math.round(Math.abs(Math.sin(t * 4)) * 3);
+      const bx = x + 1, by = y - 14 - b;
+      px(bx - 1, by - 1, 9, 12, C.k);
+      px(bx, by, 7, 10, C.alert);
+      px(bx + 3, by + 2, 1, 4, C.k); px(bx + 3, by + 7, 1, 1, C.k);
+      px(bx + 3, by + 10, 2, 2, C.k); // tail
+    }
+    if (s.status === "asleep" && !reducedMotion) {
+      const f = (t * 0.8) % 1;
+      const zx = x + 10 + f * 4, zy = y - 2 - f * 8;
+      ctx.globalAlpha = 1 - f;
+      px(zx, zy, 3, 1, "#fff"); px(zx + 1, zy + 1, 1, 1, "#fff"); px(zx, zy + 2, 3, 1, "#fff");
+      ctx.globalAlpha = 1;
+    }
+    if (s.flash && s.flash.kind === "puff" && now - s.flash.at < 1600) {
+      const p = (now - s.flash.at) / 1600;
+      ctx.globalAlpha = 1 - p;
+      const cy = y - 6 - p * 6;
+      px(x + 1, cy, 4, 3, C.puff); px(x + 4, cy - 2, 4, 4, C.puff); px(x + 7, cy, 4, 3, C.puff);
+      ctx.globalAlpha = 1;
+    }
+    if (s.quip && s.status === "working" && now - s.quip.at < 2500) {
+      ctx.font = "5px monospace";
+      const w = Math.ceil(ctx.measureText(s.quip.text).width) + 4;
+      const bx = x + 5 - Math.round(w / 2), by = y - 22;
+      px(bx - 1, by - 1, w + 2, 9, C.k);
+      px(bx, by, w, 7, "#fff");
+      px(x + 4, by + 8, 2, 2, C.k); px(x + 4, by + 7, 2, 1, "#fff"); // tail
+      ctx.fillStyle = C.k;
+      ctx.textBaseline = "top";
+      ctx.fillText(s.quip.text, bx + 2, by + 1);
+    }
+    if (s.id === selectedId) {
+      px(x + 4, y - 5, 3, 1, "#fff"); px(x + 5, y - 4, 1, 1, "#fff");
+    }
+  }
+
+  function serverNow() { return Date.now() + clockOffset; }
+
+  function drawEmptyRoom() {
+    drawRoom({ y: 0, h: layout.height }, 0);
+    // a few empty desks so the space reads as an office
+    for (let i = 0; i < SLOTS; i++) {
+      const seat = { deskX: FIRST_X + i * SLOT_W + 2, deskTop: WALL + 18, sy: WALL };
+      px(seat.deskX + 14, seat.sy + 9, 12, 10, C.chair);
+      drawDesk(seat, { status: "idle" }, 0);
+    }
+  }
+
+  let lastT = performance.now();
+  function frame(nowMs) {
+    const dt = Math.min(0.1, (nowMs - lastT) / 1000);
+    lastT = nowMs;
+    const t = nowMs / 1000;
+    stepActors(dt);
+
+    ctx.setTransform(scale * devicePixelRatio, 0, 0, scale * devicePixelRatio, 0, 0);
+    ctx.imageSmoothingEnabled = false;
+    ctx.fillStyle = "#14121f";
+    ctx.fillRect(0, 0, W, layout.height);
+    hitboxes = [];
+
+    if (!layout.rooms.length) {
+      drawEmptyRoom();
+    }
+
+    const bubbleQueue = [];
+    for (const room of layout.rooms) {
+      drawRoom(room, t);
+      const list = [...room.sessions].sort((a, b) => layout.seats.get(a.id).sy - layout.seats.get(b.id).sy);
+      for (const s of list) {
+        const seat = layout.seats.get(s.id);
+        const a = actors.get(s.id);
+        const l = looks(s.id, s.title);
+        const seated = a && a.path.length === 0 && !a.leaving;
+        if (seated) {
+          const pos = drawSeatedWorker(seat, s, a, t, l);
+          drawDesk(seat, s, t);
+          drawHandsAndProps(seat, s, pos.x, pos.y, t, l);
+          hitboxes.push({ sid: s.id, x: pos.x - 2, y: pos.y - 14, w: 14, h: 32 });
+          bubbleQueue.push([s, pos.x, pos.y]);
+        } else {
+          px(seat.wx - 1, seat.sy + 9, 12, 10, C.chair);
+          drawDesk(seat, s, t);
+        }
+        Object.keys(s.interns || {}).forEach((agentId, k) => {
+          const ia = actors.get(`${s.id}:${agentId}`);
+          if (ia && k < 2 && ia.path.length === 0 && !ia.leaving) drawIntern(seat, s, ia, t, k);
+        });
+      }
+    }
+
+    // walkers on top of the furniture
+    for (const a of actors.values()) {
+      const moving = a.path.length > 0 || a.leaving;
+      if (!moving) continue;
+      const s = state.sessions.find((x) => x.id === a.sid) || { id: a.sid, status: "leaving" };
+      if (a.kind === "worker") {
+        const l = looks(a.sid);
+        drawWalker(a, l, t);
+        hitboxes.push({ sid: a.sid, x: a.x - 2, y: a.y - 2, w: 14, h: 18 });
+        bubbleQueue.push([s, a.x, a.y]);
+      } else {
+        drawIntern(layout.seats.get(a.sid) || { sy: a.y }, s, a, t, a.index || 0);
+      }
+    }
+    for (const [s, x, y] of bubbleQueue) drawBubbles(s, x, y, t);
+
+    requestAnimationFrame(frame);
+  }
+
+  // ================= DOM overlay =================
+  function resize() {
+    const avail = floorWrap.clientWidth - 40;
+    scale = Math.max(2, Math.min(3, Math.floor(avail / W)));
+    const h = layout.height;
+    canvas.width = W * scale * devicePixelRatio;
+    canvas.height = h * scale * devicePixelRatio;
+    canvas.style.width = `${W * scale}px`;
+    canvas.style.height = `${h * scale}px`;
+    renderOverlay();
+  }
+
+  function modeBadge(mode) {
+    if (mode === "bypassPermissions") return `<span class="badge danger">Bypass permissions</span>`;
+    if (mode === "plan") return `<span class="badge plan">Plan mode</span>`;
+    if (mode === "acceptEdits") return `<span class="badge">Auto-accept edits</span>`;
+    return "";
+  }
+
+  function renderOverlay() {
+    const S = scale;
+    let html = "";
+    if (!layout.rooms.length) {
+      html += `<div class="empty" style="top:${(WALL + 30) * S}px">
+        <h2>Nobody's in yet</h2>
+        <p>Start a Claude session in VS Code and a worker will walk in. Want to see it first? Run the demo.</p>
+        <button class="btn" data-action="demo">Run demo</button>
+      </div>`;
+    }
+    for (const room of layout.rooms) {
+      const modes = [...new Set(room.sessions.map((s) => s.permissionMode))];
+      html += `<div class="room-sign" style="left:${24 * S}px;top:${(room.y + 5) * S}px" title="${esc(room.cwd)}">
+        ${esc(room.project)} <span class="where">${esc(room.host)}</span>${modes.map(modeBadge).join("")}
+      </div>`;
+      for (const s of room.sessions) {
+        const seat = layout.seats.get(s.id);
+        const l = looks(s.id, s.title);
+        const interns = Object.keys(s.interns || {}).length;
+        const line = s.status === "waiting" ? (s.question?.text || "Needs you")
+          : s.status === "asleep" ? "Dozed off — no activity for a while"
+          : s.status === "leaving" ? "Heading home"
+          : s.currentText || "Waiting for a task";
+        const internNote = interns ? ` +${interns} intern${interns > 1 ? "s" : ""}` : "";
+        html += `<button class="nameplate ${esc(s.status)}${s.id === selectedId ? " selected" : ""}"
+            data-sid="${esc(s.id)}"
+            style="left:${seat.sx * S}px;top:${(seat.sy + 31) * S}px;width:${(SLOT_W - 4) * S}px"
+            aria-label="${esc(l.name)} in ${esc(room.project)}: ${esc(line)}">
+          <span class="bar"><span class="lamp"></span><span class="who">${esc(l.name)}${esc(internNote)}</span></span>
+          <span class="line">${esc(line)}</span>
+        </button>`;
+      }
+    }
+    overlay.innerHTML = html;
+  }
+
+  overlay.addEventListener("click", (e) => {
+    const plate = e.target.closest("[data-sid]");
+    if (plate) return select(plate.dataset.sid);
+    if (e.target.closest('[data-action="demo"]')) runDemo();
+  });
+
+  canvas.addEventListener("click", (e) => {
+    const r = canvas.getBoundingClientRect();
+    const x = (e.clientX - r.left) / scale, y = (e.clientY - r.top) / scale;
+    const hit = hitboxes.find((b) => x >= b.x && x <= b.x + b.w && y >= b.y && y <= b.y + b.h);
+    if (hit) select(hit.sid);
+  });
+  canvas.addEventListener("mousemove", (e) => {
+    const r = canvas.getBoundingClientRect();
+    const x = (e.clientX - r.left) / scale, y = (e.clientY - r.top) / scale;
+    canvas.style.cursor = hitboxes.some((b) => x >= b.x && x <= b.x + b.w && y >= b.y && y <= b.y + b.h) ? "pointer" : "default";
+  });
+
+  // ================= inspector =================
+  function select(id) {
+    selectedId = id;
+    inspectorTab = "activity";
+    renderOverlay();
+    renderInspector();
+  }
+
+  function renderInspector() {
+    const s = state.sessions.find((x) => x.id === selectedId);
+    if (!s) { inspector.hidden = true; return; }
+    const l = looks(s.id, s.title);
+    inspector.hidden = false;
+    const statusWords = { idle: "Waiting for a task", working: "Working", waiting: "Needs you", done: "Finished work, waiting for more", asleep: "Dozed off", leaving: "Heading home" };
+    const interns = Object.entries(s.interns || {});
+    inspector.innerHTML = `
+      <div class="insp-head">
+        <div>
+          <h2>${esc(l.name)}</h2>
+          <div class="sub">${esc(statusWords[s.status] || s.status)} in ${esc(s.project)}${interns.length ? `, with ${interns.length} intern${interns.length > 1 ? "s" : ""}` : ""}</div>
+        </div>
+        <button class="close" data-close aria-label="Close">×</button>
+      </div>
+      <div class="pointed">
+        <dl>
+          <dt>Machine</dt><dd>${esc(s.host)}</dd>
+          <dt>Folder</dt><dd>${esc(s.cwd || "unknown")}</dd>
+          <dt>Session</dt><dd>${esc(s.id)}</dd>
+          <dt>Mode</dt><dd>${esc(s.permissionMode)}</dd>
+        </dl>
+      </div>
+      ${s.status === "waiting" && s.question ? `
+        <div class="sticky">
+          <strong>${s.question.kind === "permission" ? "Waiting for your OK" : "Asking you something"}</strong>
+          <p>${esc(s.question.text)}</p>
+          <small>Answer in VS Code. The office only watches for now.</small>
+        </div>` : ""}
+      <div class="tabs" role="tablist">
+        <button class="tab" role="tab" data-tab="activity" aria-selected="${inspectorTab === "activity"}">Activity</button>
+        <button class="tab" role="tab" data-tab="rulebook" aria-selected="${inspectorTab === "rulebook"}">Rulebook</button>
+      </div>
+      <div id="tabBody"></div>`;
+    renderTab(s);
+  }
+
+  function renderTab(s) {
+    const body = inspector.querySelector("#tabBody");
+    if (!body) return;
+    if (inspectorTab === "activity") {
+      const interns = Object.values(s.interns || {});
+      body.innerHTML = `
+        ${s.lastPrompt ? `<div class="section-title">Bosses orders:</div><div class="prompt-box">${esc(s.lastPrompt)}</div>` : ""}
+        ${interns.length ? `<div class="section-title">Interns</div><ul class="feed">${interns.map((i) =>
+          `<li class="intern"><span class="when">${esc(i.type)}</span><span class="what">${esc(i.text || "Getting set up")}</span></li>`).join("")}</ul>` : ""}
+        <div class="section-title">What's been happening</div>
+        <ul class="feed">${[...s.feed].reverse().map((f) =>
+          `<li class="${esc(f.kind)}"><span class="when">${ago(f.at)}</span><span class="what">${esc(f.text)}</span></li>`).join("") || `<li><span></span><span class="hint">Nothing yet.</span></li>`}</ul>`;
+    } else {
+      body.innerHTML = `<p class="hint">Loading the rulebook…</p>`;
+      fetch(`/api/rulebook?session=${encodeURIComponent(s.id)}`)
+        .then((r) => r.json())
+        .then((data) => {
+          if (inspectorTab !== "rulebook" || selectedId !== s.id) return;
+          if (data.error) { body.innerHTML = `<p class="hint">${esc(data.error)}</p>`; return; }
+          const files = data.files.map((f, i) => `
+            <details class="rule-file"${i === 0 ? " open" : ""}>
+              <summary>${esc(f.label)}<span>${esc(f.path)}</span></summary>
+              <pre>${esc(f.content)}</pre>
+            </details>`).join("");
+          const loaded = data.loaded?.length
+            ? `<div class="section-title">Loaded into this session</div><ul class="feed">${data.loaded.map((p) =>
+                `<li><span class="when">file</span><span class="what" style="font-family:var(--code);font-size:13px">${esc(p)}</span></li>`).join("")}</ul>`
+            : "";
+          body.innerHTML = (files || `<p class="hint">No CLAUDE.md or rules files found for ${esc(s.cwd || "this folder")}. Add a CLAUDE.md at the project root to give this worker standing instructions.</p>`) + loaded;
+        })
+        .catch(() => { body.innerHTML = `<p class="hint">Couldn't reach the office server. Is <code>node server.js</code> still running?</p>`; });
+    }
+  }
+
+  inspector.addEventListener("click", (e) => {
+    if (e.target.closest("[data-close]")) { selectedId = null; inspector.hidden = true; renderOverlay(); return; }
+    const tab = e.target.closest("[data-tab]");
+    if (tab) {
+      inspectorTab = tab.dataset.tab;
+      inspector.querySelectorAll("[data-tab]").forEach((b) => b.setAttribute("aria-selected", b === tab));
+      const s = state.sessions.find((x) => x.id === selectedId);
+      if (s) renderTab(s);
+    }
+  });
+
+  // ================= hook check =================
+  const auditDialog = document.getElementById("auditDialog");
+  document.getElementById("auditBtn").addEventListener("click", () => {
+    const rows = (state.expected || []).map((name) => {
+      const n = state.audit?.[name] || 0;
+      return `<tr class="${n ? "" : "zero"}"><td>${esc(name)}</td><td>${n}</td></tr>`;
+    }).join("");
+    document.getElementById("auditTable").innerHTML = rows;
+    auditDialog.showModal();
+  });
+
+  // ================= demo =================
+  const demoBtn = document.getElementById("demoBtn");
+  const demoOn = () => state.sessions.some((s) => s.demo && s.status !== "leaving");
+  function runDemo() { fetch("/api/demo", { method: "POST" }); }
+  demoBtn.addEventListener("click", () => demoOn() ? fetch("/api/clear-demo", { method: "POST" }) : runDemo());
+
+  // ================= live connection =================
+  const connDot = document.getElementById("connDot");
+  const watchText = document.getElementById("watchText");
+
+  function applySnapshot(snap) {
+    state = snap;
+    clockOffset = snap.serverTime - Date.now();
+    const oldHeight = layout.height;
+    computeLayout();
+    syncActors();
+    if (layout.height !== oldHeight || canvas.width === 0) resize(); else renderOverlay();
+    if (selectedId) {
+      const tabBody = inspector.querySelector("#tabBody");
+      const scroll = inspector.scrollTop;
+      if (inspectorTab === "activity" || !tabBody) renderInspector();
+      inspector.scrollTop = scroll;
+    }
+    const waiting = state.sessions.filter((s) => s.status === "waiting").length;
+    demoBtn.textContent = demoOn() ? "Clear demo" : "Run demo";
+    document.title = waiting ? `(${waiting}) Agent Office` : "Agent Office";
+    const n = state.sessions.length;
+    document.body.classList.toggle("public", !!snap.public);
+    if (snap.public) { watchText.textContent = `Live view${n ? `, ${n} at work` : ""}`; return; }
+    watchText.innerHTML = `Watching Claude sessions on <b>${esc(snap.watching.host)}</b>, hooks post to <code>${esc(snap.watching.endpoint)}</code>${n ? `, ${n} at work` : ""}`;
+  }
+
+  function connect() {
+    const es = new EventSource("/stream");
+    es.onopen = () => { connDot.className = "dot live"; };
+    es.onmessage = (e) => { try { applySnapshot(JSON.parse(e.data)); } catch (err) { console.error(err); } };
+    es.onerror = () => {
+      connDot.className = "dot down";
+      watchText.textContent = "Can't reach the office server. Run node server.js, then this page reconnects on its own.";
+    };
+  }
+
+  new ResizeObserver(() => resize()).observe(floorWrap);
+  computeLayout();
+  resize();
+  connect();
+  requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>

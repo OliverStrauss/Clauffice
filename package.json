@@ -1,0 +1,13 @@
+{
+  "name": "clauffice",
+  "version": "0.1.0",
+  "description": "A pixel-art office that shows what your Claude Code sessions are doing.",
+  "private": true,
+  "engines": { "node": ">=18" },
+  "scripts": {
+    "start": "node server.js",
+    "public": "PUBLIC_PORT=4243 node server.js",
+    "hooks:install": "node install-hooks.js",
+    "hooks:remove": "node install-hooks.js --remove"
+  }
+}
