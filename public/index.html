@@ -47,13 +47,6 @@
   .watching { display: flex; align-items: center; gap: 8px; color: var(--muted); font-size: 14px; }
   .watching b { color: var(--ink); font-weight: 700; }
   .watching code { font: 13px var(--code); color: var(--ink); }
-  /* 5h plan limit drawn as a coffee machine: pot fill = usage left */
-  .coffee { display: flex; align-items: center; gap: 10px; padding: 4px 10px 4px 6px; background: #14121f; border: 3px solid var(--panel-edge); border-top-width: 6px; font: 12px var(--pixel); color: var(--muted); letter-spacing: .5px; }
-  .coffee[hidden] { display: none; }
-  .pot { position: relative; width: 18px; height: 22px; border: 2px solid var(--ink); border-top-width: 3px; background: #2a2742; overflow: hidden; }
-  .pot::after { content: ""; position: absolute; right: -6px; top: 4px; width: 4px; height: 8px; border: 2px solid var(--ink); border-left: none; }
-  .brew { position: absolute; left: 0; right: 0; bottom: 0; background: #6b3e1f; border-top: 2px solid var(--wood); transition: height .6s; }
-  .coffee b { color: var(--alert); font-weight: 700; margin-right: 6px; }
   .dot { width: 10px; height: 10px; background: var(--muted); box-shadow: 0 0 0 2px #14121f; }
   .dot.live { background: var(--working); }
   .dot.down { background: var(--error); }
@@ -200,7 +193,6 @@
   <header class="topbar">
     <h1 class="brand">Agent Office</h1>
     <div class="watching" id="watching"><span class="dot" id="connDot"></span><span id="watchText">Connecting…</span></div>
-    <div class="coffee" id="usage" hidden></div>
     <div class="actions">
       <button class="btn" id="demoBtn">Run demo</button>
       <button class="btn" id="auditBtn">Hook check</button>
@@ -520,6 +512,35 @@
     px(pxX + 5, pyY - 9, 2, 4, C.leaf);
   }
 
+  // 5h plan limit as the office coffee machine, on the wall of the first room.
+  // Pot fill = usage left; the reset time is when a new pot gets brewed.
+  // statusline.js forwards it, and Claude Code only sends it for Pro/Max plans.
+  function drawCoffeeMachine(y, t) {
+    const w = state.usage?.five_hour;
+    if (!w || w.used_percentage == null) return;
+    const left = Math.max(0, Math.min(100, Math.round(100 - w.used_percentage)));
+    const x = 118, top = y + WALL - 21;
+    px(x, top, 16, 18, C.k);               // body
+    px(x + 1, top + 1, 14, 4, C.monitor);  // head
+    px(x + 11, top + 2, 2, 2, left ? C.working : C.alert); // power light
+    px(x + 3, top + 5, 10, 12, C.base);    // pot bay
+    px(x + 4, top + 7, 8, 9, C.monitorEdge); // pot glass
+    const fill = Math.round(9 * left / 100);
+    if (fill) px(x + 4, top + 16 - fill, 8, fill, "#6b3e1f");
+    px(x + 12, top + 9, 2, 5, C.k);        // handle
+    if (left && !reducedMotion) {
+      const f = Math.floor(t * 3) % 3;
+      px(x + 6 + f, top - 2 - f, 1, 1, C.steam);
+    }
+    const reset = w.resets_at ? new Date(w.resets_at * 1000).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" }) : "?";
+    ctx.font = "5px monospace";
+    ctx.textBaseline = "top";
+    ctx.fillStyle = C.alert;
+    ctx.fillText(`${left}%`, x - 20, top + 3);
+    ctx.fillStyle = C.steam;
+    ctx.fillText(reset, x - 28, top + 10);
+  }
+
   function drawDesk(seat, s, t) {
     const { deskX, deskTop } = seat;
     // desk
@@ -693,6 +714,7 @@
 
   function drawEmptyRoom() {
     drawRoom({ y: 0, h: layout.height }, 0);
+    drawCoffeeMachine(0, 0);
     // a few empty desks so the space reads as an office
     for (let i = 0; i < SLOTS; i++) {
       const seat = { deskX: FIRST_X + i * SLOT_W + 2, deskTop: WALL + 18, sy: WALL };
@@ -721,6 +743,7 @@
     const bubbleQueue = [];
     for (const room of layout.rooms) {
       drawRoom(room, t);
+      if (room === layout.rooms[0]) drawCoffeeMachine(room.y, t);
       const list = [...room.sessions].sort((a, b) => layout.seats.get(a.id).sy - layout.seats.get(b.id).sy);
       for (const s of list) {
         const seat = layout.seats.get(s.id);
@@ -967,20 +990,6 @@
     document.body.classList.toggle("public", !!snap.public);
     if (snap.public) { watchText.textContent = `Live view${n ? `, ${n} at work` : ""}`; return; }
     watchText.innerHTML = `Watching Claude sessions on <b>${esc(snap.watching.host)}</b>, hooks post to <code>${esc(snap.watching.endpoint)}</code>${n ? `, ${n} at work` : ""}`;
-    renderUsage(snap.usage);
-  }
-
-  // 5h plan limit, forwarded by statusline.js. Claude Code only sends it for Pro/Max plans.
-  function renderUsage(u) {
-    const el = document.getElementById("usage");
-    const w = u?.five_hour;
-    el.hidden = !(w && w.used_percentage != null);
-    if (el.hidden) return;
-    const left = Math.max(0, Math.round(100 - w.used_percentage));
-    const reset = w.resets_at ? new Date(w.resets_at * 1000).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" }) : "?";
-    el.title = `5-hour window: ${left}% left, resets ${reset}`;
-    el.innerHTML = `<div class="pot"><div class="brew" style="height:${left}%"></div></div>`
-      + `COFFEE LEFT <b>${left}%</b> TIME TILL NEW POT <b>${esc(reset)}</b>`;
   }
 
   function connect() {
