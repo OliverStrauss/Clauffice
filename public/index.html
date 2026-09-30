@@ -817,7 +817,7 @@
     }
     for (const room of layout.rooms) {
       const modes = [...new Set(room.sessions.map((s) => s.permissionMode))];
-      html += `<div class="room-sign" style="left:${24 * S}px;top:${(room.y + 5) * S}px" title="${esc(room.cwd)}">
+      html += `<div class="room-sign" style="right:${8 * S}px;top:${(room.y + 5) * S}px" title="${esc(room.cwd)}">
         ${esc(room.project)} <span class="where">${esc(room.host)}</span>${modes.map(modeBadge).join("")}
       </div>`;
       for (const s of room.sessions) {
