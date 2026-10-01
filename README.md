@@ -74,3 +74,7 @@ Port 4243 is a separate, read-only office. It shows workers, rooms named after p
 ## Safety
 
 The server only listens on 127.0.0.1. Keep it that way until you add authentication, because the event stream contains your prompts, commands, and file paths.
+
+## Test
+
+This line exists to test the pull request flow. Safe to close without merging.
